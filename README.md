@@ -11,7 +11,7 @@ Features
 - Experimental WebGL experience
 
 ### Tech Stack
-Next.js / HTML
+HTML
 Three.js
 JavaScript
 Tailwind CSS
