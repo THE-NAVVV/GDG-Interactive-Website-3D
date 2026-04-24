@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GDG LNMIIT - Interactive Experience</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&family=JetBrains+Mono:wght@400;700&display=swap');
+        
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #020202; 
+            color: white;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            /* Balanced Spacing: Top 2.5rem, Bottom 1.5rem */
+            padding: 2.5rem 2.5rem 1.5rem 2.5rem;
+            box-sizing: border-box;
+        }
+
+        .interactive {
+            pointer-events: auto;
+        }
+
+        .gradient-text {
+            background: linear-gradient(90deg, #4285F4, #EA4335, #FBBC05, #34A853);
+            background-size: 300%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradientFlow 5s ease infinite;
+        }
+
+        @keyframes gradientFlow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .btn-glass {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            color: #fff;
+        }
+        .btn-glass:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.6);
+            transform: translateY(-2px);
+            box-shadow: 0 0 20px rgba(66, 133, 244, 0.3);
+        }
+
+        /* Pulse Animation */
+        .btn-pulse {
+            animation: pulseGlow 2s infinite;
+        }
+        @keyframes pulseGlow {
+            0% { box-shadow: 0 0 0 0 rgba(66, 133, 244, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(66, 133, 244, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(66, 133, 244, 0); }
+        }
+
+        /* Tech Box Styles */
+        .tech-box {
+            background: rgba(10, 10, 12, 0.6);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            transition: border-color 0.3s;
+        }
+        .tech-box:hover {
+            border-color: rgba(66, 133, 244, 0.4);
+        }
+        .box-header {
+            background: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .scan-line {
+            width: 100%;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.1);
+            position: absolute;
+            top: 0;
+            left: 0;
+            animation: scan 4s linear infinite;
+            pointer-events: none;
+        }
+        @keyframes scan {
+            0% { top: 0%; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+
+        .bar {
+            width: 10px;
+            background: #4285F4;
+            border-radius: 2px;
+            animation: barBounce 1s ease-in-out infinite alternate;
+        }
+        @keyframes barBounce {
+            0% { height: 10%; opacity: 0.5; }
+            100% { height: 90%; opacity: 1; box-shadow: 0 0 10px #4285F4; }
+        }
+
+        /* Entry Animations */
+        .fade-in-left {
+            animation: fadeInLeft 1s ease-out forwards;
+            opacity: 0;
+            transform: translateX(-20px);
+        }
+        @keyframes fadeInLeft { to { opacity: 1; transform: translateX(0); } }
+
+        .fade-in-right {
+            animation: fadeInRight 1s ease-out forwards;
+            opacity: 0;
+            transform: translateX(20px);
+        }
+        @keyframes fadeInRight { to { opacity: 1; transform: translateX(0); } }
+
+        /* Modal */
+        #join-modal {
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        #join-modal.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+        #join-modal:not(.hidden) {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <div id="ui-layer">
+        
+        <!-- Top Nav -->
+        <nav class="flex justify-between items-center w-full interactive">
+            <div class="flex gap-16 text-xs font-bold tracking-widest text-gray-400">
+                <a href="#" class="hover:text-white transition-colors">HOME</a>
+                <a href="#" class="hover:text-white transition-colors">EVENTS</a>
+                <a href="#" class="hover:text-white transition-colors">TEAM</a>
+                <a href="#" class="hover:text-white transition-colors">PROJECTS</a>
+            </div>
+            <div class="flex gap-4">
+                <button id="btn-join" class="btn-glass btn-pulse rounded-full px-6 py-2 text-xs uppercase tracking-wide font-bold">Join Chapter</button>
+                <button class="btn-glass rounded-full w-9 h-9 flex items-center justify-center text-xs">✕</button>
+            </div>
+        </nav>
+
+        <!-- SECTION 1: HEADLINE -->
+        <div class="interactive flex flex-col items-start max-w-4xl mt-40 fade-in-left"> 
+            <h1 class="text-7xl md:text-8xl font-bold leading-tight tracking-tight">
+                Innovating at <br>
+                <span class="gradient-text">GDG LNMIIT</span>
+            </h1>
+        </div>
+        
+        <!-- RIGHT SIDE TECH STACK -->
+        <!-- top-40 aligns with mt-40 of headline -->
+        <div class="interactive absolute right-6 top-40 flex flex-col gap-4 fade-in-right" style="animation-delay: 0.3s;">
+            
+            <!-- 1. SYSTEM MONITOR -->
+            <div class="w-80 h-44 tech-box rounded-lg overflow-hidden flex flex-col relative">
+                <div class="scan-line"></div>
+                <div class="box-header px-4 py-2 flex justify-between items-center">
+                    <div class="flex gap-2 items-center">
+                        <div class="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                        <span class="text-xs font-bold text-gray-300 tracking-wider">SYS_MONITOR</span>
+                    </div>
+                    <span class="text-[10px] text-gray-600 font-mono">CPU: 42%</span>
+                </div>
+                <div class="p-4 flex items-end justify-between h-full pb-3 px-5">
+                    <div class="bar" style="animation-delay: 0.1s; height: 40%"></div>
+                    <div class="bar" style="animation-delay: 0.3s; height: 70%"></div>
+                    <div class="bar" style="animation-delay: 0.5s; height: 30%; background: #EA4335"></div>
+                    <div class="bar" style="animation-delay: 0.2s; height: 80%"></div>
+                    <div class="bar" style="animation-delay: 0.7s; height: 50%"></div>
+                    <div class="bar" style="animation-delay: 0.4s; height: 90%; background: #34A853"></div>
+                    <div class="bar" style="animation-delay: 0.6s; height: 60%"></div>
+                    <div class="bar" style="animation-delay: 0.8s; height: 20%"></div>
+                </div>
+            </div>
+
+            <!-- 2. DATABASE -->
+            <div class="w-80 h-52 tech-box rounded-lg overflow-hidden flex flex-col relative">
+                <div class="scan-line" style="animation-duration: 3s;"></div>
+                <div class="box-header px-4 py-2 flex justify-between items-center">
+                    <div class="flex gap-2 items-center">
+                        <div class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></div>
+                        <span class="text-xs font-black text-white tracking-wider">DATABASE</span>
+                    </div>
+                    <span class="text-[10px] text-gray-600 font-mono">v2.4</span>
+                </div>
+                <div id="terminal-content" class="p-4 font-['JetBrains_Mono'] text-[10px] leading-relaxed text-green-500/90 flex flex-col justify-end h-full break-all relative">
+                    <div class="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/40 pointer-events-none"></div>
+                </div>
+            </div>
+
+            <!-- 3. CODE COMPILER -->
+            <div class="w-80 h-48 tech-box rounded-lg overflow-hidden flex flex-col relative">
+                <div class="scan-line" style="animation-duration: 5s;"></div>
+                <div class="box-header px-4 py-2 flex justify-between items-center">
+                    <div class="flex gap-2 items-center">
+                        <div class="w-1.5 h-1.5 rounded-full bg-yellow-500"></div>
+                        <span class="text-xs font-bold text-gray-300 tracking-wider">COMPILER_NODE</span>
+                    </div>
+                    <span class="text-[10px] text-gray-600 font-mono">Running...</span>
+                </div>
+                <div id="compiler-content" class="p-4 font-['JetBrains_Mono'] text-[10px] leading-relaxed text-gray-300 flex flex-col justify-end h-full whitespace-nowrap overflow-hidden relative">
+                    <div class="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/40 pointer-events-none"></div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- BOTTOM SECTION -->
+        <div class="interactive mt-auto w-full flex flex-col md:flex-row justify-between items-end gap-8 mb-0 fade-in-left" style="animation-delay: 0.6s;">
+            <div class="flex flex-col items-start gap-6 max-w-2xl">
+                <div class="flex gap-6 text-[10px] tracking-[0.25em] text-gray-500 font-bold uppercase">
+                    <span>Develop</span> \ <span>Connect</span> \ <span>Grow</span> \ <span>Learn</span>
+                </div>
+                <p class="text-sm text-gray-400 leading-relaxed border-l-2 border-gray-700 pl-4">
+                    Empowering developers to build scalable platforms and orchestrating the next generation of tech solutions. We turn code into impact.
+                </p>
+            </div>
+            <div class="flex gap-5 items-center shrink-0">
+                <button class="btn-glass rounded-full px-8 py-3 text-sm font-bold">Upcoming Events</button>
+                <div class="relative group cursor-pointer">
+                     <button class="btn-glass rounded-full pl-6 pr-14 py-3 text-sm font-bold">Start Building</button>
+                     <div class="absolute right-1.5 top-1.5 w-9 h-9 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-lg transition-transform duration-300 group-hover:scale-110 group-hover:rotate-90 group-hover:bg-white group-hover:text-black">+</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- JOIN MODAL -->
+    <div id="join-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm hidden">
+        <div class="bg-[#0a0a0a] border border-gray-800 p-8 rounded-2xl w-96 shadow-2xl relative">
+            <button id="close-modal" class="absolute top-4 right-4 text-gray-500 hover:text-white">✕</button>
+            <h2 class="text-2xl font-bold mb-2 text-white">Join GDG LNMIIT</h2>
+            <p class="text-gray-400 text-xs mb-6">Enter your details to initialize connection.</p>
+            <form id="join-form" class="flex flex-col gap-4">
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1 uppercase tracking-wider">Name</label>
+                    <input type="text" id="user-name" class="w-full bg-[#1a1a1a] border border-gray-800 rounded-lg p-3 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors" placeholder="e.g. Aarav Sharma" required>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1 uppercase tracking-wider">Email</label>
+                    <input type="email" class="w-full bg-[#1a1a1a] border border-gray-800 rounded-lg p-3 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors" placeholder="student@lnmiit.ac.in" required>
+                </div>
+                <button type="submit" class="mt-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-all transform active:scale-95">
+                    INITIALIZE_USER()
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // --- THREE.JS SETUP ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x020202, 0.04);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        // Moved camera slightly back to ensure full view with new grid size
+        camera.position.set(24, 20, 24); 
+        camera.lookAt(0, -4, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        // --- GRID CONFIGURATION (Optimized by Size) ---
+        const cubes = [];
+        const gridSize = 40; // Reduced from 55 to 40 for better performance while keeping look
+        const spacing = 1.0; // Increased spacing slightly to cover area
+        const boxSize = 0.8;
+        
+        const geometry = new THREE.BoxGeometry(boxSize, boxSize, boxSize);
+        const edgeGeometry = new THREE.EdgesGeometry(geometry);
+        // Laser Beam (The feature we brought back!)
+        const beamGeometry = new THREE.CylinderGeometry(boxSize/4, boxSize/4, 8, 8);
+        beamGeometry.translate(0, 4, 0); 
+
+        const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x444444, transparent: true, opacity: 0.15 });
+        const solidMaterial = new THREE.MeshBasicMaterial({ color: 0x4285F4 });
+        const beamMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x4285F4, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false
+        });
+
+        const gridGroup = new THREE.Group();
+        const offset = (gridSize * spacing) / 2 - spacing / 2;
+
+        for (let x = 0; x < gridSize; x++) {
+            for (let z = 0; z < gridSize; z++) {
+                const xPos = x * spacing - offset;
+                const zPos = z * spacing - offset;
+
+                const line = new THREE.LineSegments(edgeGeometry, edgeMaterial);
+                line.position.set(xPos, 0, zPos);
+                
+                const solid = new THREE.Mesh(geometry, solidMaterial.clone());
+                solid.position.copy(line.position);
+                solid.scale.set(0.9, 0.9, 0.9);
+                solid.material.opacity = 0;
+                solid.material.transparent = true;
+
+                const beam = new THREE.Mesh(beamGeometry, beamMaterial.clone());
+                beam.position.copy(line.position);
+                beam.position.y -= 0.2;
+                beam.scale.set(1, 0, 1); 
+
+                const cubeData = { line, solid, beam, x, z, baseY: 0 };
+                
+                gridGroup.add(line);
+                gridGroup.add(solid);
+                gridGroup.add(beam);
+                cubes.push(cubeData);
+            }
+        }
+        
+        gridGroup.rotation.y = Math.PI / 4;
+        scene.add(gridGroup);
+
+
+        // --- INTERACTION ---
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        const target = new THREE.Vector3();
+        const plane = new THREE.Mesh(
+            new THREE.PlaneGeometry(300, 300), 
+            new THREE.MeshBasicMaterial({ visible: false })
+        );
+        plane.rotation.x = -Math.PI / 2;
+        scene.add(plane);
+
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        }
+        window.addEventListener('mousemove', onMouseMove);
+
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = clock.getElapsedTime();
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObject(plane);
+            
+            if (intersects.length > 0) {
+                target.copy(intersects[0].point);
+            }
+
+            // Render loop - Optimized by reduced grid size
+            cubes.forEach((data) => {
+                const { line, solid, beam, x, z } = data;
+                
+                // Distance Calculation
+                // Simple distance check (CPU intensive but manageable at 40x40)
+                const dx = line.position.x - target.x; // Approximate world pos logic for speed
+                const dz = line.position.z - target.z;
+                // We need accurate distance, but local vs world space matters due to rotation
+                // Using line.position (Local) vs Target (World) works because we un-rotated logic or just use simple distance
+                // Let's stick to World Position for accuracy
+                const worldPos = new THREE.Vector3();
+                line.getWorldPosition(worldPos);
+                const dist = worldPos.distanceTo(target);
+                
+                const influenceRadius = 5.5; 
+
+                if (dist < influenceRadius) {
+                    const intensity = 1 - (dist / influenceRadius);
+                    const power = Math.pow(intensity, 2.5); 
+
+                    const liftHeight = power * 3.0; 
+                    line.position.y += (liftHeight - line.position.y) * 0.15;
+                    solid.position.y = line.position.y;
+                    beam.position.y = line.position.y;
+
+                    // Laser Beam Effect
+                    beam.scale.y += ((power * 1.5) - beam.scale.y) * 0.1;
+                    beam.material.opacity = power * 1.0; 
+                    solid.material.opacity = power; 
+
+                    // GDG Colors
+                    const hue = (time * 0.2 + (x * 0.05) + (z * 0.05)) % 1;
+                    const cBlue = new THREE.Color(0x4285F4);
+                    const cRed = new THREE.Color(0xEA4335);
+                    const cYellow = new THREE.Color(0xFBBC05);
+                    const cGreen = new THREE.Color(0x34A853);
+
+                    let finalColor = new THREE.Color();
+                    if(hue < 0.25) finalColor.copy(cBlue).lerp(cRed, hue * 4);
+                    else if(hue < 0.50) finalColor.copy(cRed).lerp(cYellow, (hue - 0.25) * 4);
+                    else if(hue < 0.75) finalColor.copy(cYellow).lerp(cGreen, (hue - 0.50) * 4);
+                    else finalColor.copy(cGreen).lerp(cBlue, (hue - 0.75) * 4);
+
+                    solid.material.color.copy(finalColor);
+                    beam.material.color.copy(finalColor);
+                } else {
+                    line.position.y += (0 - line.position.y) * 0.1;
+                    solid.position.y = line.position.y;
+                    beam.position.y = line.position.y;
+                    
+                    beam.scale.y += (0 - beam.scale.y) * 0.1;
+                    beam.material.opacity *= 0.9;
+                    solid.material.opacity *= 0.9;
+                }
+            });
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // --- BACKEND LOGIC (MOCK) ---
+        const terminal = document.getElementById('terminal-content');
+        const maxLinesDB = 8;
+        const linesDB = [
+            "> CONNECTED TO GDG_NODE_01",
+            "> WAITING FOR INPUT...",
+            "> 0x4A1B... VERIFIED",
+            "> STATUS: ONLINE"
+        ];
+
+        function generateRandomHex(length) {
+            const chars = '0123456789ABCDEF';
+            let result = '';
+            for (let i = 0; i < length; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
+            return result;
+        }
+
+        function renderTerminal() {
+            if(!terminal) return;
+            terminal.innerHTML = linesDB.map((line, i) => {
+                const opacity = 0.4 + (i / linesDB.length) * 0.6;
+                const style = line.includes("USER:") ? "color: #4ade80; font-weight: bold;" : ""; 
+                return `<div style="opacity: ${opacity}; ${style}">${line}</div>`;
+            }).join('');
+        }
+
+        setInterval(() => {
+            if(linesDB.length > maxLinesDB) linesDB.shift();
+            linesDB.push(`> PING... ${Math.floor(Math.random()*50)}ms`);
+            renderTerminal();
+        }, 2000);
+
+        const modal = document.getElementById('join-modal');
+        const btnJoin = document.getElementById('btn-join');
+        const btnClose = document.getElementById('close-modal');
+        const form = document.getElementById('join-form');
+        const nameInput = document.getElementById('user-name');
+
+        btnJoin.addEventListener('click', () => modal.classList.remove('hidden'));
+        btnClose.addEventListener('click', () => modal.classList.add('hidden'));
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = nameInput.value;
+            modal.classList.add('hidden');
+            if(linesDB.length > maxLinesDB) linesDB.shift();
+            linesDB.push(`> NEW USER: [${name.toUpperCase()}] JOINED`);
+            if(linesDB.length > maxLinesDB) linesDB.shift();
+            linesDB.push(`> AUTH_TOKEN: ${generateRandomHex(12)}`);
+            renderTerminal();
+            nameInput.value = "";
+            setTimeout(() => alert(`Welcome, ${name}! Check the database screen.`), 100);
+        });
+
+        const compiler = document.getElementById('compiler-content');
+        const linesCode = [];
+        const snippets = [
+            '<span class="text-pink-400">const</span> <span class="text-blue-300">init</span> = <span class="text-pink-400">async</span> () => {',
+            '  <span class="text-pink-400">await</span> db.<span class="text-yellow-300">connect</span>();',
+            '  <span class="text-gray-500">// Connected to shard 01</span>',
+            '  <span class="text-pink-400">return</span> <span class="text-blue-300">true</span>;',
+            '}',
+            '<span class="text-pink-400">if</span> (err) <span class="text-yellow-300">throw</span> err;',
+            '<span class="text-blue-300">console</span>.<span class="text-yellow-300">log</span>(<span class="text-green-300">"Done"</span>);'
+        ];
+
+        function updateCompiler() {
+            const snippet = snippets[Math.floor(Math.random() * snippets.length)];
+            linesCode.push(snippet);
+            if (linesCode.length > 8) linesCode.shift();
+            if (compiler) {
+                compiler.innerHTML = linesCode.map((line, i) => {
+                    const opacity = 0.4 + (i / 8) * 0.6;
+                    return `<div style="opacity: ${opacity}">${line}</div>`;
+                }).join('');
+            }
+        }
+        setInterval(updateCompiler, 400);
+
+    </script>
+</body>
+</html>
